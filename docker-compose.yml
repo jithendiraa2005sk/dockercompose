@@ -1,66 +1,62 @@
-version: "3.8"
-
-services:
-  react-frontend:
-    build:
-      context: ./frontend  # Path to your React frontend Dockerfile
-      dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
-    networks:
-      - app-network
-    volumes:
-      - ./frontend/src:/app/src # Mount your frontend source code
-      - /app/node_modules # Prevents host node_modules from overriding container node_modules
-    depends_on:
-      - spring-backend
-
-  spring-backend:
-    build:
-      context: ./backend  # Path to your Spring Boot backend Dockerfile
-      dockerfile: Dockerfile
-    ports:
-      - "8080:8080"
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-db:3306/mydb
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: password
-      SPRING_REDIS_HOST: redis
-      SPRING_REDIS_PORT: 6379
-    networks:
-      - app-network
-    depends_on:
-      - mysql-db
-      - redis
-    volumes:
-      - ./backend/src:/app/src # Mount backend source code
-      - ./backend/target:/app/target # Mount target directory, useful for hot reloading
-
-  mysql-db:
-    image: mysql:8.0
-    environment:
-      MYSQL_ROOT_PASSWORD: password
-      MYSQL_DATABASE: mydb
-    ports:
-      - "3306:3306" # Remove this line in production for security reasons
-    networks:
-      - app-network
-    volumes:
-      - mysql-data:/var/lib/mysql # Persist MySQL data
-
-  redis:
-    image: redis:latest
-    ports:
-      - "6379:6379" # Remove this line in production for security reasons
-    networks:
-      - app-network
-    volumes:
-      - redis-data:/data # Persist Redis data
+version: '3.8'
 
 networks:
-  app-network:
+  app_network:
     driver: bridge
 
+services:
+  frontend:
+    image: node:18
+    command: sh -c "npx create-react-app my-app && cd my-app && npm start"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: always
+    networks:
+      - app_network
+
+  backend:
+    image: openjdk:17-jdk-slim # Using OpenJDK 17 for Spring Boot
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+      - redis
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/mydatabase
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=rootpassword
+      - SPRING_REDIS_HOST=redis
+      - SPRING_REDIS_PORT=6379
+    volumes:
+      - ./backend:/app # Mount your Spring Boot application code
+    working_dir: /app
+    command: ./gradlew bootRun # Assuming you're using Gradle. Adjust for Maven.
+    restart: always
+    networks:
+      - app_network
+
+  db:
+    image: mysql:8.0
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: mydatabase
+    volumes:
+      - db_data:/var/lib/mysql
+    restart: always
+    networks:
+      - app_network
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    restart: always
+    networks:
+      - app_network
+
 volumes:
-  mysql-data:
-  redis-data:
+  db_data:
